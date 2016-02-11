@@ -38,9 +38,9 @@ arg=$1
 
 if [ "$arg" == '-h' ]; then
 	# show help
-	echo "$0 - sets up brouter to NAT IPv4, and bridge IPv6"
-	echo "-D    delete brouter, v6bridge, IPv4 NAT config"
-	echo "-h    this help"
+	echo "	$0 - sets up brouter to NAT IPv4, and bridge IPv6"
+	echo "	-D    delete brouter, v6bridge, IPv4 NAT config"
+	echo "	-h    this help"
 	echo "  "
 	echo " By Craig Miller - Version: $VERSION"
 	exit 1
@@ -128,5 +128,5 @@ iptables -L
 iptables -t nat -L
 
 
-echo "pau"
+echo "--- pau"
 
