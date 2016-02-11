@@ -17,6 +17,7 @@ For example, given the router with eth0 and eth1 interfaces:
 * IPv4: Inside LAN and Outside LAN are two broadcast domains and routed (via NAT)
 
 ![](https://raw.githubusercontent.com/cvmiller/v6brouter/master/art/brouter.svg)
+<img src="https://raw.githubusercontent.com/cvmiller/v6brouter/master/art/brouter.svg" alt="brouter">
 
 
 ```
