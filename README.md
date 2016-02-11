@@ -29,6 +29,8 @@ Bash is easy to read, understand, and execute. The v6brouter shell script is des
 
 ## Examples
 
+The `v6brouter.sh` script can be run multiple times, as it will cleanup before adding bridge elements and rules. Use the -D option when deleting the v6brouter.
+
 #### Help
 
 ```
@@ -90,7 +92,6 @@ Chain POSTROUTING (policy ACCEPT)
 target     prot opt source               destination         
 MASQUERADE  all  --  anywhere             anywhere            
 --- pau
-
 ```
 
 #### Deleting v6brouter
@@ -121,15 +122,15 @@ OUTSIDE_IP=10.1.1.177
 
 ## Dependencies
 
-Script requires `ebtables`, `iptables`, `brctl` and must be run via `sudo` or as root, as it is making changes to bridging and iptables in kernel space.
+Script requires `ebtables`, `iptables`, `brctl`, `ip` and must be run via `sudo` or as root, as it is making changes to bridging and iptables in kernel space. It has been tested with Ubuntu 14.04 LTS.
 
-
+It also assumes that two (2) interfaces are available for brouting.
 
 ## Limitations
 
 The script assumes /24 IPv4 subnets.
 
-
+The script does **NOT** configure any firewall. Do not recommend using this for a device directly connected to the internet without first adding firewall rules.
 
 ## Contributors
 
