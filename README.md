@@ -16,6 +16,9 @@ For example, given the router with eth0 and eth1 interfaces:
 * IPv6: Inside LAN and Outside LAN are one multicast domain or bridged
 * IPv4: Inside LAN and Outside LAN are two broadcast domains and routed (via NAT)
 
+![](https://raw.github.com/cvmiller/v6brouter/art/brouter.svg)
+
+
 ```
 #	(Inside LAN)----->eth0 (br0) eth1----->(Outside LAN)
 #					 (   brouter    )
