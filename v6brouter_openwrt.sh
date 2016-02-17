@@ -67,7 +67,8 @@ if [ "$arg" == "-R" ]; then
 fi
 
 echo "--- checking for ebtables"
-ERR=$(which ebtables)
+which ebtables
+ERR=$?
 if (( $ERR == 1 ));then
 	echo "ebtables not found, please install, quitting"
 	exit 1
