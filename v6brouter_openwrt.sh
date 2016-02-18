@@ -38,7 +38,7 @@ INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=0.91
+VERSION=0.92
 
 # get arg from CLI
 arg=$1
@@ -158,6 +158,10 @@ ebtables -t broute -A BROUTING -p arp -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
 # setup for router - accept all ipv4 packets with our MAC address
 ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE -d $INSIDE_MAC -j DROP
 ebtables -t broute -A BROUTING -p ipv4 -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
+
+# allow DHCP request to go to stack
+ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE -d ff:ff:ff:ff:ff:ff  -j DROP
+
 
 # show tables
 ebtables -t broute -L

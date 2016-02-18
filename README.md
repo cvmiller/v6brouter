@@ -191,7 +191,7 @@ Script requires `ebtables`, `iptables`, `brctl`, `ip` and must be run via `sudo`
 
 It also assumes that two (2) interfaces are available for brouting.
 
-### for OpenWRT
+#### for OpenWRT
 One only needs to install `bash`, and `ebtables`. It has been tested on Chaos Calmer (v15.05) of OpenWRT.
 
 ## Limitations
@@ -200,7 +200,7 @@ The script assumes /24 IPv4 subnets.
 
 The script does **NOT** configure any firewall. Do not recommend using this for a device directly connected to the internet without first adding firewall rules.
 
-### for OpenWRT
+#### for OpenWRT
 The network connection will be reset when running the script, as interfaces are deleted and added. One should be able to re-login using the IPv4 inside address or the IPv6 management address.
 
 The openwrt version of the script uses the OpenWRT firewall and IPv4 NAT. The script does not adjust the iptables rules.
