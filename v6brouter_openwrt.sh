@@ -16,6 +16,8 @@
 #
 #	Adapted from v6brouter.sh (for generic linux IPv6 brouter)
 #
+#	TODO: Add status option
+#
 #
 #	Craig Miller 16 February 2016
 
@@ -38,7 +40,7 @@ INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=0.92
+VERSION=0.93
 
 # get arg from CLI
 arg=$1
