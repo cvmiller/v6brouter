@@ -8,9 +8,9 @@ There is also a generic version of the script (tested on Ubuntu 14.04 LTS) which
 
 ## Motivation
 
-IPv4 NAT is everywhere. From an IPv6 point of view NAT is a cancer which breaks end to end network connectivity. NAT is used from large-scale CGNs (Carrier Grade NAT), to little home routers, to your cell phone, when you want to turn on a *hotspot*.
+IPv4 NAT is everywhere. From an IPv6 point of view NAT is a cancer which breaks end to end network connectivity. NAT is used from large-scale CGNs (Carrier Grade NAT), to little home routers, down to your cell phone, when you want to turn on a *hotspot*.
 
-With 18,446,744,073,709,551,616 (2^64) potential IPv6 addresses on a LAN segment, there are more than enough addresses to extend the IPv6 network across many of the NAT scenarios.
+With 18,446,744,073,709,551,616 (2^64) potential IPv6 addresses on a LAN segment, there are more than enough addresses to extend the IPv6 network across many of the smaller NAT scenarios.
 
 #### Bridging IPv6, while routing IPv4
 By using bridging for IPv6, it just works. The *inside* network is connected transparently (for IPv6) to the *outside* network. Using a v6brouter, allows you to extend the IPv6 network with minimal effort and maximum compatibility, while maintaining current IPv4 NAT-based typologies.
@@ -28,7 +28,7 @@ For example, given the router with eth0.1 and eth1 interfaces:
 ```
 
 #### Leveraging Netfilter
-The v6brouter script leverages Netfilter heavily, by utilizing `ebtables` (for bridging) and `iptables` (for NAT). Netfilter does all the heavy lifting, and is well optimized code. More information for `ebtables` can be found at [ebtabes.netfilter.org](http://ebtables.netfilter.org/examples/basic.html#ex_brouter) with specifc brouter examples.
+The v6brouter script leverages Netfilter heavily, by utilizing `ebtables` (for bridging) and `iptables` (for NAT). Netfilter does all the heavy lifting, and is well optimized code. More information for `ebtables` can be found at [ebtabes.netfilter.org](http://ebtables.netfilter.org/examples/basic.html#ex_brouter) with specific brouter examples.
 
 #### Why Bash?
 Bash is easy to read, understand, and execute. The v6brouter shell script is designed to be a working script, as well as a tutorial for those who wish to incorporate the concept of a brouter into their own networks.
@@ -222,6 +222,64 @@ That said, when in v6brouter mode, it *is* possible to log into the OpenWRT rout
 The script assumes /24 IPv4 subnets.
 
 The script does **NOT** configure any firewall. Do not recommend using this for a device directly connected to the internet without first adding firewall rules.
+
+## More Details about ebtables, IPv6-only bridging, and IPv4 routing
+
+`ebtables` is part of [netfilter](http://netfilter.org/), commonly known in Linux as `iptables` and `ip6tables`. `ebtables` however, operates on Layer 2 (think Ethernet layer) rather than Layer 3 (the network layer) of the OSI model.
+
+### Bridging Basics
+
+Bridging is where a device forwards a packet based on the destination MAC address of the packet. A bridge is only useful if it has 2 or more ports. In Linux the `brctl` command is used to assign ports (or interfaces) to the kernel-based bridge.
+
+### EtherTypes
+
+The Ethernet header has the destination MAC, source MAC, and [EtherType](http://www.iana.org/assignments/ieee-802-numbers/ieee-802-numbers.xhtml) fields.The EtherType field can be thought of a *what's next* field, as it signals to the protocol decoder what is the next header is going to be. This is a hexadecimal field, but some common values are:
+
+* **0800** IPv4
+* **0806** ARP
+* **86DD** IPv6
+
+
+### Creating an IPv6-only bridge
+
+In order to create an IPv6-only bridge, the bridging device (Linux kernel) needs to filter the packets based on the EtherType field with the value of 0x86DD, and the do the normal destination MAC address lookup.
+
+It is amazingly simple to create an IPv6-only bridge using `ebtables`. `ebtables` has three standard *chains*, INPUT, OUTPUT, and FORWARD. Since bridging involves forwarding of packets, it is the FORWARD chain that needs the IPv6-only filter rules:
+
+```
+ebtables -A FORWARD -p IPV6 -j ACCEPT
+ebtables -P FORWARD DROP
+```
+
+That's it! The first rule says forward any packet that is protocol IPv6. The second rule says, set the default policy to drop all packets. With these two lines, only the IPv6 packets (based on the EtherType field) will be forwarded, and all others, including IPv4 and ARP packets will be dropped.
+
+### Creating a Brouter is more tricky
+
+As you saw, it is decidedly easy to create an IPv6-only bridge. To create a Brouter, some packets must be bridged, and others must be sent up the stack to be evaluated and forwarded at the Network Layer (3).
+
+`ebtables` has a special chain called *broute* which when packets are *dropped* in this chain, the packets are actually not *dropped* but are sent *up* the stack to be dealt with by the networking layer and above. In order to send IPv4 and ARP packets (based on their EtherType field) to the networking layer, the following filter rules are needed:
+
+```
+# brouter interfaces
+INSIDE=eth0.1
+OUTSIDE=eth1
+
+# ebtabes rules to send ARP & IPv4 up the stack
+ebtables -t broute -A BROUTING -p arp -i $INSIDE -d $INSIDE_MAC -j DROP
+ebtables -t broute -A BROUTING -p arp -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
+ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE -d $INSIDE_MAC -j DROP
+ebtables -t broute -A BROUTING -p ipv4 -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
+```
+Once the packets are at the network layer, `iptables` can do their magic (using the special *NAT* chain) to mangle the packets for NAT. All the while IPv6 packets have been quietly bridged without the network layer knowing. 
+
+It is common in a small router, such as OpenWRT to provide DHCP services for the LAN (or $INSIDE) ports. But DHCP does not have a destination MAC address of the router, and therefore an additional rule is required to forward DHCP request packets to the stack, and DHCP server application.
+
+```
+# allow DHCP request to go to stack
+ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE -d ff:ff:ff:ff:ff:ff  -j DROP
+```
+
+Again *DROP* in the *broute* chain means send packet up the stack.
 
 
 ## Contributors
