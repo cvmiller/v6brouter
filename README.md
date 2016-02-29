@@ -281,6 +281,35 @@ ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE -d ff:ff:ff:ff:ff:ff  -j DROP
 
 Again *DROP* in the *broute* chain means send packet up the stack.
 
+### Creating a bridge firewall
+
+As stated earlier the advantage of a v6Brouter is that it just bridges IPv6 traffic. However, you may not want the upstream network to access your network. The answer is to use a firewall, and `ip6ables` is very capable.
+
+The usual way of creating a firewall is to block traffic from one interface (say the OUTSIDE) and allow traffic from the INSIDE interface. 
+
+However with a brouter, all packets appear to be coming from the BRIDGE interface from **both** directions! And because both sides of the v6Brouter share the same IPv6 prefix, you can't filter based on destination address, or source address. `ebtables` knows the correct ingress/egress interfaces, but can't filter at L3 or L4 (OpenWRT doesn't support filtering L3 with ebtables).
+
+#### So what is a firewall to do?
+
+Fortunately, the netfilter architects created a mechanism for ebtables and ip6tables to communicate, called *mark*. By *marking* a packet at L2 with `ebtables` , the *mark* can be read and acted upon (read: drop) with `ip6tables`. In order to block, say SSH traffic from the OUTSIDE, requires 3 steps:
+* Mark all packets from the OUTSIDE interface with a value, say 16 (or 0x10) with `ebtables`
+* Filter or DROP packets which have destination port 22 (for SSH) *and* the marked value of 16 with `ip6tables`
+* Enable ip6tables to inspect bridged traffic with `sysctl`
+
+At the command line, this looks like:
+
+```
+# Mark $OUTSIDE packets to be dropped by ip6tables (later)
+ebtables -A  FORWARD -p ipv6 -i $OUTSIDE -j mark --set-mark 16 --mark-target CON
+TINUE
+
+# Drop inbound SSH from $OUTSIDE interface
+ip6tables -A forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j DROP
+
+# Enable ip6tables for the bridge
+sysctl -w net.bridge.bridge-nf-call-ip6tables=1
+```
+Version 0.95 of v6brouter_openwrt.sh now contains this firewall example.
 
 ## Contributors
 

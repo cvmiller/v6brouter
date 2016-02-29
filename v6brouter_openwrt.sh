@@ -40,7 +40,7 @@ INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=0.93
+VERSION=0.95
 
 # get arg from CLI
 arg=$1
@@ -105,6 +105,11 @@ if (( $RESTORE == 1 )); then
 	ip addr del  $INSIDE_IP/24 dev $INSIDE
 	ifconfig $BRIDGE 0.0.0.0
 	ip addr add  $INSIDE_IP/24 dev $BRIDGE
+	
+	# remove BLOCK_SSH rule from ip6tables /* user rules */
+	ip6tables -D  forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j DROP
+
+
 fi
 
 
@@ -129,6 +134,9 @@ brctl show $BRIDGE
 
 # configure ebtables to bridge IPv6-only
 ebtables -F
+# Mark $OUTSIDE packets to be dropped by ip6tables (later)
+ebtables -A  FORWARD -p ipv6 -i $OUTSIDE -j mark --set-mark 16 --mark-target CONTINUE
+# allow all IPv6 packets to be bridged
 ebtables -A FORWARD -p IPV6 -j ACCEPT
 ebtables -P FORWARD DROP
 ebtables -L
@@ -150,12 +158,9 @@ echo "--- configuring brouter ipv4 interface tables"
 # broute table DROP, means forward to higher level stack
 ebtables -t broute -F
 
-#ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE --ip-dst $INSIDE_IP -j DROP
-#ebtables -t broute -A BROUTING -p ipv4 -i $OUTSIDE --ip-dst $OUTSIDE_IP -j DROP
+# send up ARP packets to stack rather than bridging them
 ebtables -t broute -A BROUTING -p arp -i $INSIDE -d $INSIDE_MAC -j DROP
 ebtables -t broute -A BROUTING -p arp -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
-#ebtables -t broute -A BROUTING -p arp -i $INSIDE --arp-ip-dst $INSIDE_IP -j DROP
-#ebtables -t broute -A BROUTING -p arp -i $OUTSIDE --arp-ip-dst $OUTSIDE_IP -j DROP
 
 # setup for router - accept all ipv4 packets with our MAC address
 ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE -d $INSIDE_MAC -j DROP
@@ -170,6 +175,16 @@ ebtables -t broute -L
 
 # NAT configuration (via iptables) remains unchanged
 
+
+# Drop inbound SSH from $OUTSIDE interface
+echo "--- BLOCK_SSH from $OUTSIDE via ip6tables"
+ip6tables -A forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j DROP
+
+
+# Enable ip6tables for the bridge
+echo "--- enable ip6tables firewall for brouter"
+
+sysctl -w net.bridge.bridge-nf-call-ip6tables=1
 
 echo "--- pau"
 
