@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 #
 #	Script uses Linux Bridge to create an IPv6-only bridge on OpenWRT 15.05
@@ -17,6 +17,7 @@
 #	Adapted from v6brouter.sh (for generic linux IPv6 brouter)
 #
 #	TODO: Add status option
+#		Add iptables rule to UCI config
 #
 #
 #	Craig Miller 16 February 2016
@@ -40,45 +41,66 @@ INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=0.95
+VERSION=0.97
 
-# get arg from CLI
-arg=$1
 
-if [ "$arg" == '-h' ]; then
+usage () {
 	# show help
+	echo "help is here"
 	echo "	$0 - sets up brouter to NAT IPv4, and bridge IPv6"
-	echo "	-D    delete brouter, v6bridge, IPv4 NAT config"
+	#echo "	-D    delete brouter, v6bridge, IPv4 NAT config"
 	echo "	-R    restore openwrt bridge config"
 	echo "	-h    this help"
 	echo "  "
 	echo " By Craig Miller - Version: $VERSION"
 	exit 1
-fi
+}
 
+
+# default options values
 CLEANUP=0
-if [ "$arg" == "-D" ]; then
-	# delete config
-	CLEANUP=1
+RESTORE=0
+numopts=0
+# get args from CLI
+while getopts "?hR" options; do
+  case $options in
+    R ) RESTORE=1
+		numopts=$((numopts+1));;
+    D ) CLEANUP=1
+		numopts=$((numopts+1));;
+    d ) DEBUG=1
+		numopts=$((numopts+1));;
+    h ) usage;;
+    \? ) usage	# show usage with flag and no value
+         exit 1;;
+    * ) usage		# show usage with unknown flag
+    	 exit 1;;
+  esac
+done
+
+# remove the options as cli arguments
+shift $(($numopts))
+
+# check that there are no arguments left to process
+if [ $# -ne 0 ]; then
+	usage
+	exit 1
 fi
 
-RESTORE=0
-if [ "$arg" == "-R" ]; then
-	# delete config
-	RESTORE=1
-fi
 
 echo "--- checking for ebtables"
 which ebtables
 ERR=$?
-if (( $ERR == 1 ));then
+if [ $ERR -eq 1 ]; then
 	echo "ebtables not found, please install, quitting"
 	exit 1
 fi
 
+
+
 # remove previous bridge
 old_bridge=$(brctl show | grep $BRIDGE | cut -f 1)
-if [ "$old_bridge" == "$BRIDGE" ] && [ $RESTORE -eq 0 ]; then
+if [ "$old_bridge" = "$BRIDGE" ] && [ $RESTORE -eq 0 ]; then
 	echo "-- delete old bridge:$BRIDGE"
 	brctl delif $BRIDGE $INSIDE 2> /dev/null
 	brctl delif $BRIDGE $OUTSIDE 2> /dev/null
@@ -91,7 +113,7 @@ if [ "$old_bridge" == "$BRIDGE" ] && [ $RESTORE -eq 0 ]; then
 fi
 
 #restore openwrt default bridge, br-lan
-if (( $RESTORE == 1 )); then
+if [ $RESTORE -eq 1 ]; then
 	echo "-- Restore old bridge:$BRIDGE"
 	#brctl delif $BRIDGE $INSIDE 2> /dev/null
 	brctl delif $BRIDGE $OUTSIDE 2> /dev/null
@@ -109,11 +131,12 @@ if (( $RESTORE == 1 )); then
 	# remove BLOCK_SSH rule from ip6tables /* user rules */
 	ip6tables -D  forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j DROP
 
-
+	# restore IPv4  forward from LAN to WAN
+	iptables -D forwarding_rule --in-interface $INSIDE -j ACCEPT
 fi
 
 
-if (( $CLEANUP == 1 )) || (( $RESTORE == 1 )); then
+if [ $CLEANUP -eq 1 ] || [ $RESTORE -eq 1 ]; then
 	# flush ebtables
 	ebtables -F
 	ebtables -t broute -F
@@ -130,7 +153,7 @@ brctl addif $BRIDGE $OUTSIDE
 ip link set $BRIDGE down
 ip link set $BRIDGE up
 
-brctl show $BRIDGE
+brctl show
 
 # configure ebtables to bridge IPv6-only
 ebtables -F
@@ -145,14 +168,18 @@ ebtables -L
 INSIDE_MAC=$(ip link show dev $INSIDE | grep link | cut -d " " -f 6)
 OUTSIDE_MAC=$(ip link show dev $OUTSIDE | grep link | cut -d " " -f 6)
 
+# add static IPv4 addresses to interfaces
+#ip addr flush dev $BRIDGE
+ifconfig $BRIDGE 0.0.0.0
+#ip addr add $INSIDE_IP/24 dev $INSIDE
+#ip addr add $OUTSIDE_IP/24 dev $OUTSIDE
+ifconfig $INSIDE $INSIDE_IP netmask 255.255.255.0
+ifconfig $OUTSIDE $OUTSIDE_IP netmask 255.255.255.0
+
 echo "--- assigning IPv6 management address $BRIDGE_IP6 to $BRIDGE"
 # add IPv6/IPv4 management address to bridge
 ip addr add  $BRIDGE_IP6/64 dev $BRIDGE
 
-# add static IPv4 addresses to interfaces
-ifconfig $BRIDGE 0.0.0.0
-ifconfig $INSIDE $INSIDE_IP netmask 255.255.255.0
-ifconfig $OUTSIDE $OUTSIDE_IP netmask 255.255.255.0
 
 echo "--- configuring brouter ipv4 interface tables"
 # broute table DROP, means forward to higher level stack
@@ -174,6 +201,9 @@ ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE -d ff:ff:ff:ff:ff:ff  -j DROP
 ebtables -t broute -L
 
 # NAT configuration (via iptables) remains unchanged
+# IPv4 LAN port moved from $BRIDGE to $INPUT, need rule to forward from LAN to WAN
+echo "--- Move NAT input port to $INSIDE with iptables"
+iptables -A forwarding_rule --in-interface $INSIDE -j ACCEPT
 
 
 # Drop inbound SSH from $OUTSIDE interface
