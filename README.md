@@ -199,7 +199,7 @@ BRIDGE_IP6=2001:470:1d:583::11
 
 ## Dependencies
 
-One only needs to install `bash`, and `ebtables`. It has been tested on Chaos Calmer (v15.05) of OpenWRT.
+One only needs to install `ebtables`. It has been tested on Chaos Calmer (v15.05) of OpenWRT. (removed `bash` dependency as of v0.97)
 
 #### for Ubuntu or general Linux systems
 
