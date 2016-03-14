@@ -1,5 +1,15 @@
 #!/bin/sh
 
+##################################################################################
+#
+#  Copyright (C) 2016 Craig Miller
+#
+#  See the file "LICENSE" for information on usage and redistribution
+#  of this file, and for a DISCLAIMER OF ALL WARRANTIES.
+#  Distributed under GPLv2 License
+#
+##################################################################################
+
 #
 #	Script uses Linux Bridge to create an IPv6-only bridge on OpenWRT 15.05
 #
@@ -41,15 +51,15 @@ INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=0.97
+VERSION=0.98
 
 
 usage () {
 	# show help
 	echo "help is here"
 	echo "	$0 - sets up brouter to NAT IPv4, and bridge IPv6"
-	#echo "	-D    delete brouter, v6bridge, IPv4 NAT config"
 	echo "	-R    restore openwrt bridge config"
+	echo "	-F    configure v6Bridge FireWall"
 	echo "	-h    this help"
 	echo "  "
 	echo " By Craig Miller - Version: $VERSION"
@@ -60,13 +70,16 @@ usage () {
 # default options values
 CLEANUP=0
 RESTORE=0
+FIREWALL=0
 numopts=0
 # get args from CLI
-while getopts "?hR" options; do
+while getopts "?hRF" options; do
   case $options in
     R ) RESTORE=1
 		numopts=$((numopts+1));;
     D ) CLEANUP=1
+		numopts=$((numopts+1));;
+    F ) FIREWALL=1
 		numopts=$((numopts+1));;
     d ) DEBUG=1
 		numopts=$((numopts+1));;
@@ -133,6 +146,9 @@ if [ $RESTORE -eq 1 ]; then
 
 	# restore IPv4  forward from LAN to WAN
 	iptables -D forwarding_rule --in-interface $INSIDE -j ACCEPT
+	
+	# disable ip6tables inspection of bridge traffic
+	sysctl -w net.bridge.bridge-nf-call-ip6tables=0
 fi
 
 
@@ -157,8 +173,10 @@ brctl show
 
 # configure ebtables to bridge IPv6-only
 ebtables -F
-# Mark $OUTSIDE packets to be dropped by ip6tables (later)
-ebtables -A  FORWARD -p ipv6 -i $OUTSIDE -j mark --set-mark 16 --mark-target CONTINUE
+if [ $FIREWALL -eq 1 ];then
+	# Mark $OUTSIDE packets to be dropped by ip6tables (later)
+	ebtables -A  FORWARD -p ipv6 -i $OUTSIDE -j mark --set-mark 16 --mark-target CONTINUE
+fi
 # allow all IPv6 packets to be bridged
 ebtables -A FORWARD -p IPV6 -j ACCEPT
 ebtables -P FORWARD DROP
@@ -205,16 +223,16 @@ ebtables -t broute -L
 echo "--- Move NAT input port to $INSIDE with iptables"
 iptables -A forwarding_rule --in-interface $INSIDE -j ACCEPT
 
+if [ $FIREWALL -eq 1 ];then
+	# Drop inbound SSH from $OUTSIDE interface
+	echo "--- BLOCK_SSH from $OUTSIDE via ip6tables"
+	ip6tables -A forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j DROP
+	ip6tables -L forwarding_rule
 
-# Drop inbound SSH from $OUTSIDE interface
-echo "--- BLOCK_SSH from $OUTSIDE via ip6tables"
-ip6tables -A forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j DROP
-
-
-# Enable ip6tables for the bridge
-echo "--- enable ip6tables firewall for brouter"
-
-sysctl -w net.bridge.bridge-nf-call-ip6tables=1
+	# Enable ip6tables for the bridge
+	echo "--- enable ip6tables firewall for v6Bridge"
+	sysctl -w net.bridge.bridge-nf-call-ip6tables=1
+fi
 
 echo "--- pau"
 
