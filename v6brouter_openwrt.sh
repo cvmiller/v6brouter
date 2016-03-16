@@ -26,7 +26,7 @@
 #
 #	Adapted from v6brouter.sh (for generic linux IPv6 brouter)
 #
-#	TODO: Add status option
+#	TODO: 
 #		Add iptables rule to UCI config
 #
 #
@@ -51,7 +51,7 @@ INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=0.98
+VERSION=0.99
 
 
 usage () {
@@ -60,6 +60,7 @@ usage () {
 	echo "	$0 - sets up brouter to NAT IPv4, and bridge IPv6"
 	echo "	-R    restore openwrt bridge config"
 	echo "	-F    configure v6Bridge FireWall"
+	echo "	-s    show status of $0"
 	echo "	-h    this help"
 	echo "  "
 	echo " By Craig Miller - Version: $VERSION"
@@ -71,15 +72,18 @@ usage () {
 CLEANUP=0
 RESTORE=0
 FIREWALL=0
+STATUS=0
 numopts=0
 # get args from CLI
-while getopts "?hRF" options; do
+while getopts "?hRFs" options; do
   case $options in
     R ) RESTORE=1
 		numopts=$((numopts+1));;
     D ) CLEANUP=1
 		numopts=$((numopts+1));;
     F ) FIREWALL=1
+		numopts=$((numopts+1));;
+    s ) STATUS=1
 		numopts=$((numopts+1));;
     d ) DEBUG=1
 		numopts=$((numopts+1));;
@@ -107,6 +111,17 @@ ERR=$?
 if [ $ERR -eq 1 ]; then
 	echo "ebtables not found, please install, quitting"
 	exit 1
+fi
+
+if [ $STATUS -eq 1 ];then
+	echo "--- checking status of v6Brouter"
+	erule=$(ebtables -L | grep IPv6)
+	if [ -z "$erule" ]; then
+		echo "    v6Brouter DISABLED"
+	else
+		echo "    v6Brouter enabled"	
+	fi
+	exit 0
 fi
 
 
