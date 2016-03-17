@@ -30,8 +30,8 @@ For example, given the router with eth0.1 and eth1 interfaces:
 #### Leveraging Netfilter
 The v6brouter script leverages Netfilter heavily, by utilizing `ebtables` (for bridging) and `iptables` (for NAT). Netfilter does all the heavy lifting, and is well optimized code. More information for `ebtables` can be found at [ebtabes.netfilter.org](http://ebtables.netfilter.org/examples/basic.html#ex_brouter) with specific brouter examples.
 
-#### Why Bash?
-Bash is easy to read, understand, and execute. The v6brouter shell script is designed to be a working script, as well as a tutorial for those who wish to incorporate the concept of a brouter into their own networks.
+#### Why shell script?
+Shell script is easy to read, understand, and execute. The v6brouter shell script is designed to be a working script, as well as a tutorial for those who wish to incorporate the concept of a brouter into their own networks. The OpenWRT included `/bin/sh` works just fine with v6brouter shell script.
 
 ## Examples
 
@@ -48,16 +48,18 @@ If you want the v6brouter configuration to survive reboots:
 
 #### Help
 ```
-root@openwrt:/tmp# ./v6brouter_openwrt.sh -h
+root@openwrt:# ./v6brouter_openwrt.sh -h
 	./v6brouter_openwrt.sh - sets up brouter to NAT IPv4, and bridge IPv6
-	-D    delete brouter, v6bridge, IPv4 NAT config
-	-R    restore openwrt default bridge config
-	-h    this help 
+	-R    restore openwrt bridge config
+	-F    configure v6Bridge FireWall
+	-s    show status of ./v6brouter_openwrt.sh
+	-h    this help
+
 ```
 #### Running v6brouter_openwrt.sh
 
 ```
-root@openwrt:/tmp# ./v6brouter_openwrt.sh 
+root@openwrt:# ./v6brouter_openwrt.sh 
 --- checking for ebtables
 -- delete old bridge:br-lan
 bridge name	bridge id		STP enabled	interfaces
@@ -66,7 +68,6 @@ Cannot find device "br-lan"
 bridge name	bridge id		STP enabled	interfaces
 br-lan		8000.0024a5d73088	no		eth0.1
 					            		eth1
-brctl: invalid argument 'br-lan' to 'brctl'
 Bridge table: filter
 
 Bridge chain: INPUT, entries: 0, policy: ACCEPT
@@ -87,10 +88,22 @@ Bridge chain: BROUTING, entries: 4, policy: ACCEPT
 --- pau
 ```
 
+#### Viewing Status of v6brouter
+
+Forgot if the v6brouter is already enabled? No problem a **status** option has been added, which will report *enabled* or *DISABLED*.
+```
+root@openwrt:# ./v6brouter_openwrt.sh -s
+--- checking for ebtables
+/usr/sbin/ebtables
+--- checking status of v6Brouter
+    v6Brouter enabled
+```
+
 #### Restoring OpenWRT (by removing v6brouter)
 
+Remove v6brouter config, thus restoring the *normal* OpenWRT operation.
 ```
-root@openwrt:/tmp# ./v6brouter_openwrt.sh -R
+root@openwrt:# ./v6brouter_openwrt.sh -R
 --- checking for ebtables
 -- Restore old bridge:br-lan
 bridge name	bridge id		STP enabled	interfaces
@@ -102,7 +115,7 @@ br-lan		8000.0024a5d73088	no		eth0.1
 
 ### Generic v6brouter.sh with IPv4 NAT
 
-The `v6brouter.sh` script can be run multiple times, as it will cleanup before adding bridge elements and rules. Use the -D option when deleting the v6brouter.
+The `v6brouter.sh` script can be run multiple times, as it will cleanup before adding bridge elements and rules. Use the -D option when deleting the v6brouter. This script is more of a learning exercise, and active development is on the OpenWRT version.
 #### Help
 ```
 $ ./v6brouter.sh -h
@@ -177,7 +190,10 @@ $ sudo ./v6brouter.sh -D
 
 ## Installation
 
-Install `bash` and `ebtables` on your OpenWRT router.
+Install `ebtables` on your OpenWRT router using LuCI or via the command line:
+```
+# opkg install ebtables
+```
 
 Copy `v6brouter_openwrt.sh` to your router, edit values (for interfaces, and addresses) near the top of the script and run. 
 
@@ -212,9 +228,9 @@ It also assumes that two (2) interfaces are available for brouting.
 
 The network connection may be reset when running the script, as interfaces are deleted and added. If this happens, one should be able to re-login using the IPv4 **inside network** address or the IPv6 management address.
 
-The openwrt version of the script uses the OpenWRT firewall and IPv4 NAT. The script does not change the iptables rules. 
+The openwrt version of the script uses the OpenWRT firewall and IPv4 NAT. The script does not change the iptables rules. When using the `-F` option to enable the v6Bridge Firewall, an entry is added to the the ip6tables user chain `forwrding_rule` to drop *OUTSIDE* ssh connections.
 
-That said, when in v6brouter mode, it *is* possible to log into the OpenWRT router via `ssh` from the **outside network**. You *may* wish to add an IPv6 firewall rule to prevent this. 
+When in v6brouter mode, it *is* possible to log into the OpenWRT router via `ssh` from the **outside network**. You *may* wish to add an IPv6 firewall rule to prevent this. 
 
 
 #### for Ubuntu or general Linux systems
@@ -272,7 +288,7 @@ ebtables -t broute -A BROUTING -p ipv4 -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
 ```
 Once the packets are at the network layer, `iptables` can do their magic (using the special *NAT* chain) to mangle the packets for NAT. All the while IPv6 packets have been quietly bridged without the network layer knowing. 
 
-It is common in a small router, such as OpenWRT to provide DHCP services for the LAN (or $INSIDE) ports. But DHCP does not have a destination MAC address of the router, and therefore an additional rule is required to forward DHCP request packets to the stack, and DHCP server application.
+It is common in a small router, such as OpenWRT to provide IPv4 DHCP services for the LAN (or $INSIDE) ports. But DHCP does not have a destination MAC address of the router, and therefore an additional rule is required to forward DHCP request packets to the stack, and DHCP server application.
 
 ```
 # allow DHCP request to go to stack
@@ -283,7 +299,7 @@ Again *DROP* in the *broute* chain means send packet up the stack.
 
 ### Creating a bridge firewall
 
-As stated earlier the advantage of a v6Brouter is that it just bridges IPv6 traffic. However, you may not want the upstream network to access your network. The answer is to use a firewall, and `ip6ables` is very capable.
+As stated earlier the advantage of a v6Brouter is that it just bridges IPv6 traffic, thus extending the existing IPv6 prefix address space. However, you may not want the upstream network to access your network. The answer is to use a firewall, and `ip6ables` is very capable.
 
 The usual way of creating a firewall is to block traffic from one interface (say the OUTSIDE) and allow traffic from the INSIDE interface. 
 
@@ -309,7 +325,7 @@ ip6tables -A forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j DROP
 # Enable ip6tables for the bridge
 sysctl -w net.bridge.bridge-nf-call-ip6tables=1
 ```
-Version 0.95 of v6brouter_openwrt.sh now contains this firewall example.
+Version 0.98 of v6brouter_openwrt.sh now contains this firewall example, enable with **-F** option.
 
 ## Contributors
 

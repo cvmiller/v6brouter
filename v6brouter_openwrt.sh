@@ -56,7 +56,6 @@ VERSION=0.99
 
 usage () {
 	# show help
-	echo "help is here"
 	echo "	$0 - sets up brouter to NAT IPv4, and bridge IPv6"
 	echo "	-R    restore openwrt bridge config"
 	echo "	-F    configure v6Bridge FireWall"
