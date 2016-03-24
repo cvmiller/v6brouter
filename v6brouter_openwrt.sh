@@ -37,6 +37,7 @@
 # 	OUTSIDE: is the public IP address
 #	BRIDGE: is name of the bridge to create
 
+### Buffalo 15.05 ####
 # change these to match your interfaces
 INSIDE=eth0.1
 OUTSIDE=eth1
@@ -51,11 +52,30 @@ INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=0.99
+VERSION=1.0
+
+
+#### TP LINK 15.05.1 #####
+# change these to match your interfaces
+INSIDE=eth0.1
+OUTSIDE=eth0.2
+BRIDGE=br-lan
+
+# IPv6 Management address
+BRIDGE_IP6=2001:470:1d:583::12
+
+# not used for OpenWRT
+# change IPv4 address to match your IPv4 networks
+INSIDE_IP=192.168.12.1
+OUTSIDE_IP=10.1.1.188
+
+
+
 
 
 usage () {
 	# show help
+	echo "help is here"
 	echo "	$0 - sets up brouter to NAT IPv4, and bridge IPv6"
 	echo "	-R    restore openwrt bridge config"
 	echo "	-F    configure v6Bridge FireWall"
@@ -123,21 +143,11 @@ if [ $STATUS -eq 1 ];then
 	exit 0
 fi
 
+# determine wireless interfaces in use
+WIRELESS=$(brctl show | grep 'wlan')
 
-
-# remove previous bridge
-old_bridge=$(brctl show | grep $BRIDGE | cut -f 1)
-if [ "$old_bridge" = "$BRIDGE" ] && [ $RESTORE -eq 0 ]; then
-	echo "-- delete old bridge:$BRIDGE"
-	brctl delif $BRIDGE $INSIDE 2> /dev/null
-	brctl delif $BRIDGE $OUTSIDE 2> /dev/null
-	ip link set $BRIDGE down 2> /dev/null
-	brctl delbr $BRIDGE 2> /dev/null
-	brctl show
-	# remove config
-	# remove IPv6 management address to bridge
-	ip addr del  $BRIDGE_IP6/64 dev $BRIDGE	
-fi
+# determine IPv4 route 
+IP4_DEFAULT=$(ip route | grep default | cut -d ' ' -f 3)
 
 #restore openwrt default bridge, br-lan
 if [ $RESTORE -eq 1 ]; then
@@ -156,13 +166,19 @@ if [ $RESTORE -eq 1 ]; then
 	ip addr add  $INSIDE_IP/24 dev $BRIDGE
 	
 	# remove BLOCK_SSH rule from ip6tables /* user rules */
-	ip6tables -D  forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j DROP
+	ip6tables -D  forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j DROP 2> /dev/null
 
 	# restore IPv4  forward from LAN to WAN
 	iptables -D forwarding_rule --in-interface $INSIDE -j ACCEPT
 	
 	# disable ip6tables inspection of bridge traffic
 	sysctl -w net.bridge.bridge-nf-call-ip6tables=0
+	
+	# restore IPv4 default route
+	#ip route add default via $IP4_DEFAULT
+	
+	#restore network
+	/etc/init.d/network restart
 fi
 
 
@@ -228,6 +244,18 @@ ebtables -t broute -A BROUTING -p ipv4 -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
 # allow DHCP request to go to stack
 ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE -d ff:ff:ff:ff:ff:ff  -j DROP
 
+#FIXME: router can only ping6 default gateway, but it forwards IPv6 just fine
+# setup for router - accept all ipv6 packets with our MAC address
+#ebtables -t broute -A BROUTING -p ipv6 -i $INSIDE -d $INSIDE_MAC -j DROP
+#ebtables -t broute -A BROUTING -p ipv6 -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
+
+#ebtables -t broute -A BROUTING -p ipv6 -d $INSIDE_MAC -j redirect --redirect-target DROP
+
+# send IPv6 multicast up the stack
+#ebtables -t broute -A BROUTING -p ipv6 -i $INSIDE -d 33:33:00:00:00:00/ff:ff:00:00:00:00 -j DROP
+#ebtables -t broute -A BROUTING -p ipv6 -i $INSIDE -d 33:33:00:00:00:00/00:00:ff:ff:ff:ff -j DROP
+#ebtables -t broute -A BROUTING -p ipv6 -i $OUTSIDE -d 33:33:00:00:00:00/00:00:ff:ff:ff:ff -j DROP
+
 
 # show tables
 ebtables -t broute -L
@@ -247,6 +275,9 @@ if [ $FIREWALL -eq 1 ];then
 	echo "--- enable ip6tables firewall for v6Bridge"
 	sysctl -w net.bridge.bridge-nf-call-ip6tables=1
 fi
+
+# restore IPv4 default route
+ip route add default via $IP4_DEFAULT
 
 echo "--- pau"
 
