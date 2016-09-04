@@ -215,7 +215,7 @@ BRIDGE_IP6=2001:470:1d:583::11
 
 ## Dependencies
 
-One only needs to install `ebtables` and `ip` packages. It has been tested on Chaos Calmer (v15.05) of OpenWRT. (removed `bash` dependency as of v0.97)
+One only needs to install `ebtables` and `ip` packages. It has been tested on Chaos Calmer (v15.05.1) of OpenWRT. (removed `bash` dependency as of v0.97)
 
 #### for Ubuntu or general Linux systems
 
