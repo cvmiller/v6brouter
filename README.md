@@ -190,9 +190,10 @@ $ sudo ./v6brouter.sh -D
 
 ## Installation
 
-Install `ebtables` on your OpenWRT router using LuCI or via the command line:
+Install `ebtables` and `ip` on your OpenWRT router using LuCI or via the command line:
 ```
 # opkg install ebtables
+# opkg install ip
 ```
 
 Copy `v6brouter_openwrt.sh` to your router, edit values (for interfaces, and addresses) near the top of the script and run. 
