@@ -44,33 +44,28 @@ OUTSIDE=eth1
 BRIDGE=br-lan
 
 # IPv6 Management address
-BRIDGE_IP6=2001:470:1d:583::11
+BRIDGE_IP6=2001:470:ebbd:0::11
 
-# not used for OpenWRT
 # change IPv4 address to match your IPv4 networks
 INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=1.0
+VERSION=1.1
 
 
 #### TP LINK 15.05.1 #####
 # change these to match your interfaces
-INSIDE=eth0.1
-OUTSIDE=eth0.2
-BRIDGE=br-lan
+#INSIDE=eth0.1
+#OUTSIDE=eth0.2
+#BRIDGE=br-lan
 
 # IPv6 Management address
-BRIDGE_IP6=2001:470:1d:583::12
+#BRIDGE_IP6=2001:470:1d:583::12
 
-# not used for OpenWRT
 # change IPv4 address to match your IPv4 networks
-INSIDE_IP=192.168.12.1
-OUTSIDE_IP=10.1.1.188
-
-
-
+#INSIDE_IP=192.168.12.1
+#OUTSIDE_IP=10.1.1.188
 
 
 usage () {
@@ -177,6 +172,10 @@ if [ $RESTORE -eq 1 ]; then
 	# restore IPv4 default route
 	#ip route add default via $IP4_DEFAULT
 	
+	# restore RA on LAN
+	uci set dhcp.lan.ra=server
+	uci commit
+	
 	#restore network
 	/etc/init.d/network restart
 fi
@@ -203,6 +202,16 @@ brctl show
 
 # configure ebtables to bridge IPv6-only
 ebtables -F
+result=$?
+
+# test that ebtables doesn't crash
+if [ $result -ne 0 ]; then
+	echo "OOPS: Looks like ebtables crashed, and doesn't work on this router"
+	echo "      without ebtables, v6brouter will not work, sorry."
+	exit 1
+fi
+
+
 if [ $FIREWALL -eq 1 ];then
 	# Mark $OUTSIDE packets to be dropped by ip6tables (later)
 	ebtables -A  FORWARD -p ipv6 -i $OUTSIDE -j mark --set-mark 16 --mark-target CONTINUE
@@ -219,23 +228,42 @@ OUTSIDE_MAC=$(ip link show dev $OUTSIDE | grep link | cut -d " " -f 6)
 # add static IPv4 addresses to interfaces
 #ip addr flush dev $BRIDGE
 ifconfig $BRIDGE 0.0.0.0
-#ip addr add $INSIDE_IP/24 dev $INSIDE
+ip addr add $INSIDE_IP/24 dev $BRIDGE
 #ip addr add $OUTSIDE_IP/24 dev $OUTSIDE
-ifconfig $INSIDE $INSIDE_IP netmask 255.255.255.0
+#ifconfig $INSIDE $INSIDE_IP netmask 255.255.255.0
 ifconfig $OUTSIDE $OUTSIDE_IP netmask 255.255.255.0
 
 echo "--- assigning IPv6 management address $BRIDGE_IP6 to $BRIDGE"
 # add IPv6/IPv4 management address to bridge
 ip addr add  $BRIDGE_IP6/64 dev $BRIDGE
 
+echo "--- IPv6 RA on LAN"
+uci set dhcp.lan.ra=disabled
+uci commit
+/etc/init.d/odhcpd restart
+
 
 echo "--- configuring brouter ipv4 interface tables"
 # broute table DROP, means forward to higher level stack
 ebtables -t broute -F
 
-# send up ARP packets to stack rather than bridging them
-ebtables -t broute -A BROUTING -p arp -i $INSIDE -d $INSIDE_MAC -j DROP
-ebtables -t broute -A BROUTING -p arp -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
+# insert ebtables arp kmod if available
+# 	install with 'opkg install kmod-ebtables-ipv4'
+modprobe ebt_arp
+ekmod_arp=$(lsmod | grep ebt_arp | cut -d " " -f 0 | head -1)
+
+
+if [ "$ekmod_arp" == "ebt_arp" ]; then
+	# send up ARP packets to stack rather than bridging them using ebt_arp kmod
+	echo "--- using ebtables arp kmod"
+	ebtables -t broute -A BROUTING -p arp -i eth0 --arp-ip-dst $INSIDE_IP -j DROP
+	ebtables -t broute -A BROUTING -p arp -i eth1 --arp-ip-dst $OUTSIDE_IP -j DROP
+else
+	# send up ARP packets to stack rather than bridging them
+	ebtables -t broute -A BROUTING -p arp -i $INSIDE -d $INSIDE_MAC -j DROP
+	ebtables -t broute -A BROUTING -p arp -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
+fi
+
 
 # setup for router - accept all ipv4 packets with our MAC address
 ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE -d $INSIDE_MAC -j DROP
