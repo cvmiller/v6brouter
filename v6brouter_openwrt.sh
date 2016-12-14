@@ -39,11 +39,11 @@
 
 ### Buffalo 15.05 ####
 # change these to match your interfaces
-INSIDE=eth0.1
+#INSIDE=eth0.1
 OUTSIDE=eth1
 BRIDGE=br-lan
 
-# IPv6 Management address
+# IPv6 Management address, to access brouter
 BRIDGE_IP6=2001:470:ebbd:0::11
 
 # change IPv4 address to match your IPv4 networks
@@ -51,7 +51,7 @@ INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=1.1
+VERSION=1.1.1
 
 
 #### TP LINK 15.05.1 #####
@@ -76,6 +76,9 @@ usage () {
 	echo "	-F    configure v6Bridge FireWall"
 	echo "	-s    show status of $0"
 	echo "	-h    this help"
+	echo "  "
+	echo "  Please edit vars in script to match your config:"
+	echo "      INSIDE, OUTSIDE, BRIDGE, BRIDGE_IP6, INSIDE_IP, OUTSIDE_IP"
 	echo "  "
 	echo " By Craig Miller - Version: $VERSION"
 	exit 1
@@ -118,6 +121,13 @@ if [ $# -ne 0 ]; then
 	exit 1
 fi
 
+# check that INSIDE and OUTSIDE interfaces are defined
+# User should have all 5 parameters set, see help
+if [ "$INSIDE"=="" ] || [ "$OUTSIDE"=="" ]; then
+	echo "   Please set the variables listed below." | grep --color ".*"
+	usage
+	exit 1
+fi
 
 echo "--- checking for ebtables"
 which ebtables
