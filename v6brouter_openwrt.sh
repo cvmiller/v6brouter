@@ -51,7 +51,7 @@ INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=1.1.1
+VERSION=1.1.2
 
 
 #### TP LINK 15.05.1 #####
@@ -123,8 +123,8 @@ fi
 
 # check that INSIDE and OUTSIDE interfaces are defined
 # User should have all 5 parameters set, see help
-if [ "$INSIDE"=="" ] || [ "$OUTSIDE"=="" ]; then
-	echo "   Please set the variables listed below." | grep --color ".*"
+if [ -z $INSIDE ] || [ -z $OUTSIDE ] ; then
+	echo "ERROR: Please set the variables listed below."
 	usage
 	exit 1
 fi
