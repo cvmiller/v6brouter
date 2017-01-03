@@ -51,7 +51,7 @@ INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=1.1.2
+VERSION=1.1.3
 
 
 #### TP LINK 15.05.1 #####
@@ -235,13 +235,16 @@ ebtables -L
 INSIDE_MAC=$(ip link show dev $INSIDE | grep link | cut -d " " -f 6)
 OUTSIDE_MAC=$(ip link show dev $OUTSIDE | grep link | cut -d " " -f 6)
 
+#-----get mask of OUTSIDE interface
+OUTSIDE_IP_CIDR=$(ip addr | grep $OUTSIDE_IP | awk '{print $2}' | cut -d '/' -f 2)
+
 # add static IPv4 addresses to interfaces
 #ip addr flush dev $BRIDGE
 ifconfig $BRIDGE 0.0.0.0
 ip addr add $INSIDE_IP/24 dev $BRIDGE
-#ip addr add $OUTSIDE_IP/24 dev $OUTSIDE
+ip addr add $OUTSIDE_IP/$OUTSIDE_IP_CIDR dev $OUTSIDE
 #ifconfig $INSIDE $INSIDE_IP netmask 255.255.255.0
-ifconfig $OUTSIDE $OUTSIDE_IP netmask 255.255.255.0
+#ifconfig $OUTSIDE $OUTSIDE_IP netmask 255.255.255.0
 
 echo "--- assigning IPv6 management address $BRIDGE_IP6 to $BRIDGE"
 # add IPv6/IPv4 management address to bridge
