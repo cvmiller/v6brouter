@@ -28,6 +28,7 @@
 #
 #	TODO: 
 #		Add iptables rule to UCI config
+#		Add wlan MACs to ebtables filters
 #
 #
 #	Craig Miller 16 February 2016
@@ -51,7 +52,7 @@ INSIDE_IP=192.168.11.1
 OUTSIDE_IP=10.1.1.177
 
 # script version
-VERSION=1.1.3
+VERSION=1.1.4
 
 
 #### TP LINK 15.05.1 #####
@@ -269,8 +270,8 @@ ekmod_arp=$(lsmod | grep ebt_arp | cut -d " " -f 0 | head -1)
 if [ "$ekmod_arp" == "ebt_arp" ]; then
 	# send up ARP packets to stack rather than bridging them using ebt_arp kmod
 	echo "--- using ebtables arp kmod"
-	ebtables -t broute -A BROUTING -p arp -i eth0 --arp-ip-dst $INSIDE_IP -j DROP
-	ebtables -t broute -A BROUTING -p arp -i eth1 --arp-ip-dst $OUTSIDE_IP -j DROP
+	ebtables -t broute -A BROUTING -p arp -i $INSIDE --arp-ip-dst $INSIDE_IP -j DROP
+	ebtables -t broute -A BROUTING -p arp -i $OUTSIDE --arp-ip-dst $OUTSIDE_IP -j DROP
 else
 	# send up ARP packets to stack rather than bridging them
 	ebtables -t broute -A BROUTING -p arp -i $INSIDE -d $INSIDE_MAC -j DROP
