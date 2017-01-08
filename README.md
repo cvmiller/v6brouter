@@ -33,25 +33,32 @@ The v6brouter script leverages Netfilter heavily, by utilizing `ebtables` (for b
 #### Why shell script?
 Shell script is easy to read, understand, and execute. The v6brouter shell script is designed to be a working script, as well as a tutorial for those who wish to incorporate the concept of a brouter into their own networks. The OpenWRT included `/bin/sh` works just fine with v6brouter shell script.
 
+#### Version 2
+Version 2 has been reworked to address issues with wlan interfaces having different MAC addresses from the LAN (br-lan) interface. It uses a much simpler approach found in [IOPSL's Blog](http://blog.iopsl.com/ipv6-behind-openwrt-router/).
+
+It differs from IOPSL's implementation in that it implements a IPv6 Firewall, which blocks all in-bound IPv6 traffic (except SSH & ICMPv6). To enable the firewall, use the `-F` parameter when starting up `v6brouter_openwrt.sh`.
+
+
 ## Examples
 
 ### OpenWRT Support
 
-Because OpenWRT already has `iptables` support for IPv4 NAT, but is lacking --ip-dst extension to `ebtabes`, a script has been created specifically for OpenWRT, called `v6brouter_openwrt.sh`. Use the -R option to remove v6brouter and *restore* the OpenWRT default bridge configuration.
+Because OpenWRT already has `iptables` support for IPv4 NAT, but is lacking --ip-dst extension to `ebtabes`, a script has been created specifically for OpenWRT, called `v6brouter_openwrt.sh`. Use the `-R` option to remove v6brouter and *restore* the OpenWRT default bridge configuration.
 
 The script does **not** make any changes to the OpenWRT UCI Configuration. Cycling power to the router will restore your previous configuration. 
 
 If you want the v6brouter configuration to survive reboots:
 * Copy script to /root on the router
-* In LuCI, System -> Startup -> Local Startup, add: `/root/v6brouter_openwrt.sh`
+* In LuCI, System -> Startup -> Local Startup, add: `/root/v6brouter_openwrt.sh -E`
 
 
 #### Help
 ```
 root@openwrt:# ./v6brouter_openwrt.sh -h
 	./v6brouter_openwrt.sh - sets up brouter to NAT IPv4, and bridge IPv6
-	-R    restore openwrt bridge config
-	-F    configure v6Bridge FireWall
+	-E    Enable openwrt v6brouter
+	-R    Restore openwrt bridge config
+	-F    configure v6Bridge FireWall (default DROP, except SSH)
 	-s    show status of ./v6brouter_openwrt.sh
 	-h    this help
 
@@ -59,38 +66,73 @@ root@openwrt:# ./v6brouter_openwrt.sh -h
 #### Running v6brouter_openwrt.sh
 
 ```
-root@openwrt:# ./v6brouter_openwrt.sh 
+root@openwrt:# ./v6brouter_openwrt.sh -E
 --- checking for ebtables
--- delete old bridge:br-lan
-bridge name	bridge id		STP enabled	interfaces
-Cannot find device "br-lan"
+/usr/sbin/ebtables
 --- configuring v6 bridge
-bridge name	bridge id		STP enabled	interfaces
-br-lan		8000.0024a5d73088	no		eth0.1
-					            		eth1
+brctl: bridge br-lan: Device or resource busy
+bridge name     bridge id               STP enabled     interfaces
+br-lan          7fff.0024a5d73088       no              eth0.1
+                                                        wlan0
+                                                        eth1
 Bridge table: filter
 
 Bridge chain: INPUT, entries: 0, policy: ACCEPT
 
-Bridge chain: FORWARD, entries: 1, policy: DROP
--p IPv6 -j ACCEPT 
+Bridge chain: FORWARD, entries: 0, policy: ACCEPT
 
 Bridge chain: OUTPUT, entries: 0, policy: ACCEPT
---- assigning IPv6 management address 2001:470:1d:583::11 to br-lan
---- configuring brouter ipv4 interface tables
+--- Disable IPv6 RA on LAN
+--- assigning IPv6 management address 2001:470:ebbd:0::11 to br-lan
+--- configuring brouter to route everything but IPv6
 Bridge table: broute
 
-Bridge chain: BROUTING, entries: 4, policy: ACCEPT
--p ARP -d 0:24:a5:d7:30:88 -i eth0.1 -j DROP 
--p ARP -d 0:24:a5:d7:30:89 -i eth1 -j DROP 
--p IPv4 -d 0:24:a5:d7:30:88 -i eth0.1 -j DROP 
--p IPv4 -d 0:24:a5:d7:30:89 -i eth1 -j DROP 
+Bridge chain: BROUTING, entries: 1, policy: ACCEPT
+-p ! IPv6 -i eth1 -j DROP 
 --- pau
 ```
 
+#### Running v6brouter_openwrt.sh with firewall
+
+```
+root@openwrt:# ./v6brouter_openwrt.sh -E -F
+--- checking for ebtables
+/usr/sbin/ebtables
+--- configuring v6 bridge
+bridge name     bridge id               STP enabled     interfaces
+br-lan          7fff.0024a5d73088       no              eth0.1
+                                                        wlan0
+                                                        eth1
+Bridge table: filter
+
+Bridge chain: INPUT, entries: 0, policy: ACCEPT
+
+Bridge chain: FORWARD, entries: 1, policy: ACCEPT
+-p IPv6 -i eth1 -j mark --mark-set 0x10 --mark-target CONTINUE
+
+Bridge chain: OUTPUT, entries: 0, policy: ACCEPT
+--- Disable IPv6 RA on LAN
+--- assigning IPv6 management address 2001:470:ebbd:0::11 to br-lan
+--- configuring brouter to route everything but IPv6
+Bridge table: broute
+
+Bridge chain: BROUTING, entries: 1, policy: ACCEPT
+-p ! IPv6 -i eth1 -j DROP 
+--- ALLOW_SSH from eth1 via ip6tables, block all others
+Chain forwarding_rule (1 references)
+target     prot opt source               destination         
+ACCEPT     tcp      anywhere             anywhere             mark match 0x10 tcp dpt:ssh
+ACCEPT     ipv6-icmp    anywhere             anywhere             mark match 0x10
+DROP       all      anywhere             anywhere             mark match 0x10
+--- enable ip6tables firewall for v6Bridge
+net.bridge.bridge-nf-call-ip6tables = 1
+--- pau
+
+```
 #### Viewing Status of v6brouter
 
 Forgot if the v6brouter is already enabled? No problem a **status** option has been added, which will report *enabled* or *DISABLED*.
+
 ```
 root@openwrt:# ./v6brouter_openwrt.sh -s
 --- checking for ebtables
@@ -102,13 +144,19 @@ root@openwrt:# ./v6brouter_openwrt.sh -s
 #### Restoring OpenWRT (by removing v6brouter)
 
 Remove v6brouter config, thus restoring the *normal* OpenWRT operation.
+
 ```
-root@openwrt:# ./v6brouter_openwrt.sh -R
+root@openwrt:#  ./v6brouter_openwrt.sh -R
 --- checking for ebtables
+/usr/sbin/ebtables
 -- Restore old bridge:br-lan
-bridge name	bridge id		STP enabled	interfaces
-br-lan		8000.0024a5d73088	no		eth0.1
+bridge name     bridge id               STP enabled     interfaces
+br-lan          7fff.0024a5d73088       no              eth0.1
+                                                        wlan0
+-- Disable ip6tables inspection of bridge traffic
+net.bridge.bridge-nf-call-ip6tables = 0
 --- cleanup done
+
 ```
 
 - - -
@@ -117,6 +165,7 @@ br-lan		8000.0024a5d73088	no		eth0.1
 
 The `v6brouter.sh` script can be run multiple times, as it will cleanup before adding bridge elements and rules. Use the -D option when deleting the v6brouter. This script is more of a learning exercise, and active development is on the OpenWRT version.
 #### Help
+
 ```
 $ ./v6brouter.sh -h
 	./v6brouter.sh - sets up brouter to NAT IPv4, and bridge IPv6
@@ -191,6 +240,7 @@ $ sudo ./v6brouter.sh -D
 ## Installation
 
 Install `ebtables` and `ip` on your OpenWRT router using LuCI or via the command line:
+
 ```
 # opkg install ebtables
 # opkg install ip
@@ -199,16 +249,12 @@ Install `ebtables` and `ip` on your OpenWRT router using LuCI or via the command
 Copy `v6brouter_openwrt.sh` to your router, edit values (for interfaces, and addresses) near the top of the script and run. 
 
 
-The following values should be adjusted for your network, and brouter:
+The following values should be adjusted for your network, and brouter (as of version 2, this is simplified):
+
 ```
 # change these to match your interfaces
-INSIDE=eth0.1
-OUTSIDE=eth1
+WAN_DEV=eth1
 BRIDGE=br-lan
-
-# change IPv4 address to match your IPv4 networks
-INSIDE_IP=192.168.11.77
-OUTSIDE_IP=10.1.1.177
 
 # IPv6 Management address
 BRIDGE_IP6=2001:470:1d:583::11
@@ -227,9 +273,9 @@ It also assumes that two (2) interfaces are available for brouting.
 
 ## Limitations
 
-The network connection may be reset when running the script, as interfaces are deleted and added. If this happens, one should be able to re-login using the IPv4 **inside network** address or the IPv6 management address.
 
-The openwrt version of the script uses the OpenWRT firewall and IPv4 NAT. The script does not change the iptables rules. When using the `-F` option to enable the v6Bridge Firewall, an entry is added to the the ip6tables user chain `forwrding_rule` to drop *OUTSIDE* ssh connections.
+
+The openwrt version of the script uses the OpenWRT firewall and IPv4 NAT. The script does not change the iptables rules. When using the `-F` option to enable the v6Bridge Firewall, an entry is added to the the ip6tables user chain `forwrding_rule` to drop all *OUTSIDE* IPv6 traffic, except SSH & ICMPv6. ICMPv6 is required for RAs and Neighbour Discovery (ND) to get across the v6Brouter.
 
 When in v6brouter mode, it *is* possible to log into the OpenWRT router via `ssh` from the **outside network**. You *may* wish to add an IPv6 firewall rule to prevent this. 
 
@@ -261,42 +307,24 @@ The Ethernet header has the destination MAC, source MAC, and [EtherType](http://
 
 In order to create an IPv6-only bridge, the bridging device (Linux kernel) needs to filter the packets based on the EtherType field with the value of 0x86DD, and the do the normal destination MAC address lookup.
 
-It is amazingly simple to create an IPv6-only bridge using `ebtables`. `ebtables` has three standard *chains*, INPUT, OUTPUT, and FORWARD. Since bridging involves forwarding of packets, it is the FORWARD chain that needs the IPv6-only filter rules:
+It is amazingly simple to create an IPv6-only bridge using `ebtables`. `ebtables` has three standard *chains*, INPUT, OUTPUT, and FORWARD. And additionally it has a built-in `broute` chain. In the broute chain, DROP means forward packet to the stack:
 
 ```
-ebtables -A FORWARD -p IPV6 -j ACCEPT
-ebtables -P FORWARD DROP
+ebtables -t broute -F
+ebtables -t broute -A BROUTING -i $WAN_DEV -p ! ipv6 -j DROP
 ```
 
-That's it! The first rule says forward any packet that is protocol IPv6. The second rule says, set the default policy to drop all packets. With these two lines, only the IPv6 packets (based on the EtherType field) will be forwarded, and all others, including IPv4 and ARP packets will be dropped.
+That's it! The first rule says delete all rules in the broute chain. The second rule says, send all non-IPv6 traffic to the stack (to be routed).
 
 ### Creating a Brouter is more tricky
 
 As you saw, it is decidedly easy to create an IPv6-only bridge. To create a Brouter, some packets must be bridged, and others must be sent up the stack to be evaluated and forwarded at the Network Layer (3).
 
-`ebtables` has a special chain called *broute* which when packets are *dropped* in this chain, the packets are actually not *dropped* but are sent *up* the stack to be dealt with by the networking layer and above. In order to send IPv4 and ARP packets (based on their EtherType field) to the networking layer, the following filter rules are needed:
+`ebtables` has a special chain called *broute* which when packets are *dropped* in this chain, the packets are actually not *dropped* but are sent *up* the stack to be dealt with by the networking layer and above. 
 
-```
-# brouter interfaces
-INSIDE=eth0.1
-OUTSIDE=eth1
-
-# ebtabes rules to send ARP & IPv4 up the stack
-ebtables -t broute -A BROUTING -p arp -i $INSIDE -d $INSIDE_MAC -j DROP
-ebtables -t broute -A BROUTING -p arp -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
-ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE -d $INSIDE_MAC -j DROP
-ebtables -t broute -A BROUTING -p ipv4 -i $OUTSIDE -d $OUTSIDE_MAC -j DROP
-```
 Once the packets are at the network layer, `iptables` can do their magic (using the special *NAT* chain) to mangle the packets for NAT. All the while IPv6 packets have been quietly bridged without the network layer knowing. 
 
-It is common in a small router, such as OpenWRT to provide IPv4 DHCP services for the LAN (or $INSIDE) ports. But DHCP does not have a destination MAC address of the router, and therefore an additional rule is required to forward DHCP request packets to the stack, and DHCP server application.
 
-```
-# allow DHCP request to go to stack
-ebtables -t broute -A BROUTING -p ipv4 -i $INSIDE -d ff:ff:ff:ff:ff:ff  -j DROP
-```
-
-Again *DROP* in the *broute* chain means send packet up the stack.
 
 ### Creating a bridge firewall
 
@@ -317,11 +345,14 @@ At the command line, this looks like:
 
 ```
 # Mark $OUTSIDE packets to be dropped by ip6tables (later)
-ebtables -A  FORWARD -p ipv6 -i $OUTSIDE -j mark --set-mark 16 --mark-target CON
-TINUE
+ebtables -A  FORWARD -p ipv6 -i $WAN_DEV -j mark --set-mark 16 --mark-target CONTINUE
 
-# Drop inbound SSH from $OUTSIDE interface
-ip6tables -A forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j DROP
+# allow SSH from the WAN
+ip6tables -A forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j ACCEPT
+# allow icmpv6 - for RAs and ND
+ip6tables -A forwarding_rule -m mark --mark 16 -p icmpv6  -j ACCEPT
+# Drop all inbound traffic from $WAN_DEV interface
+ip6tables -A forwarding_rule -m mark --mark 16  -j DROP
 
 # Enable ip6tables for the bridge
 sysctl -w net.bridge.bridge-nf-call-ip6tables=1
