@@ -52,7 +52,7 @@ BRIDGE_IP6=2001:470:ebbd:0::11
 
 
 # script version
-VERSION=2.0.b
+VERSION=2.0.c
 
 
 #### TP LINK 15.05.1 #####
@@ -162,11 +162,14 @@ if [ $RESTORE -eq 1 ]; then
 	# remove IPv6 management address to bridge
 	ip addr del  $BRIDGE_IP6/64 dev $BRIDGE	2> /dev/null
 	
-	# remove BLOCK_SSH rule from ip6tables /* user rules */
+	# remove ALLOW_SSH rule from ip6tables /* user rules */
 	ip6tables -D forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j ACCEPT 2> /dev/null
+	# remove allow ICMPv6 rule
 	ip6tables -D forwarding_rule -m mark --mark 16 -p icmpv6  -j ACCEPT 2> /dev/null
 	# remove drop all other packets
 	ip6tables -D forwarding_rule -m mark --mark 16  -j DROP 2> /dev/null
+	# remove conntrack forwarding rule
+	ip6tables -A forwarding_rule -m mark --mark 16 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 	
 	
 	echo "-- Disable ip6tables inspection of bridge traffic"
@@ -253,9 +256,14 @@ if [ $ENABLE -eq 1 ]; then
 	if [ $FIREWALL -eq 1 ];then
 		# Drop inbound SSH from $WAN_DEV interface
 		echo "--- ALLOW_SSH from $WAN_DEV via ip6tables, block all others"
-		ip6tables -A forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j ACCEPT
+		# allow conntrack connections to return data
+		ip6tables -I forwarding_rule -m mark --mark 16 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
 		# allow icmpv6 - for RAs and ND
 		ip6tables -A forwarding_rule -m mark --mark 16 -p icmpv6  -j ACCEPT
+
+		# allow external ssh
+		ip6tables -A forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j ACCEPT
 
 		# drop all other IPv6 packets
 		ip6tables -A forwarding_rule -m mark --mark 16  -j DROP
