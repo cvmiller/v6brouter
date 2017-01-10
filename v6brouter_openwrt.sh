@@ -52,7 +52,7 @@ BRIDGE_IP6=2001:470:ebbd:0::11
 
 
 # script version
-VERSION=2.0.c
+VERSION=2.0.d
 
 
 #### TP LINK 15.05.1 #####
@@ -179,8 +179,9 @@ if [ $RESTORE -eq 1 ]; then
 	# Sisable RA listen to BRIDGE
 	echo 1 > /proc/sys/net/ipv6/conf/$BRIDGE/accept_ra
 	
-	# restore sending RAs on LAN
+	# restore DHCPv6 server and sending RAs on LAN
 	uci set dhcp.lan.ra=server
+	uci set dhcp.lan.dhcpv6=server
 	uci commit
 	
 	#restore network
@@ -231,8 +232,9 @@ if [ $ENABLE -eq 1 ]; then
 	ebtables -L
 
 
-	echo "--- Disable IPv6 RA on LAN"
+	echo "--- Disable IPv6 RA and DHCPv6 Server on LAN"
 	uci set dhcp.lan.ra=disabled
+	uci set dhcp.lan.dhcpv6=disabled
 	uci commit
 	/etc/init.d/odhcpd restart
 
