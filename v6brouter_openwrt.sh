@@ -52,7 +52,7 @@ BRIDGE_IP6=2001:470:ebbd:0::11
 
 
 # script version
-VERSION=2.0.d
+VERSION=2.0.1
 
 
 #### TP LINK 15.05.1 #####
@@ -169,7 +169,7 @@ if [ $RESTORE -eq 1 ]; then
 	# remove drop all other packets
 	ip6tables -D forwarding_rule -m mark --mark 16  -j DROP 2> /dev/null
 	# remove conntrack forwarding rule
-	ip6tables -A forwarding_rule -m mark --mark 16 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+	ip6tables -D forwarding_rule -m mark --mark 16 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 	
 	
 	echo "-- Disable ip6tables inspection of bridge traffic"
