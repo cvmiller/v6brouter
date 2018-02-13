@@ -51,6 +51,8 @@ If you want the v6brouter configuration to survive reboots:
 * Copy script to /root on the router
 * In LuCI, System -> Startup -> Local Startup, add: `/root/v6brouter_openwrt.sh -E`
 
+Note: Due to the timing of when interfaces actually become available, you _may_ have to add a `sleep 5;` before the script if you find that v6brouter is _not_ working as expected on reboot.
+
 
 #### Help
 ```
