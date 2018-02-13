@@ -28,7 +28,7 @@ For example, given the router with eth0.1 and eth1 interfaces:
 ```
 
 #### Leveraging Netfilter
-The v6brouter script leverages Netfilter heavily, by utilizing `ebtables` (for bridging) and `iptables` (for NAT). Netfilter does all the heavy lifting, and is well optimized code. More information for `ebtables` can be found at [ebtabes.netfilter.org](http://ebtables.netfilter.org/examples/basic.html#ex_brouter) with specific brouter examples.
+The v6brouter script leverages Netfilter heavily, by utilizing `ebtables` (for bridging) and `iptables` (for NAT). Netfilter does all the heavy lifting, and is well optimized code. More information for `ebtables` can be found at [ebtables.netfilter.org](http://ebtables.netfilter.org/examples/basic.html#ex_brouter) with specific brouter examples.
 
 #### Why shell script?
 Shell script is easy to read, understand, and execute. The v6brouter shell script is designed to be a working script, as well as a tutorial for those who wish to incorporate the concept of a brouter into their own networks. The OpenWRT included `/bin/sh` works just fine with v6brouter shell script.
@@ -43,7 +43,7 @@ It differs from IOPSL's implementation in that it implements a IPv6 Firewall, wh
 
 ### OpenWRT Support
 
-Because OpenWRT already has `iptables` support for IPv4 NAT, but is lacking --ip-dst extension to `ebtabes`, a script has been created specifically for OpenWRT, called `v6brouter_openwrt.sh`. Use the `-R` option to remove v6brouter and *restore* the OpenWRT default bridge configuration.
+Because OpenWRT already has `iptables` support for IPv4 NAT, but is lacking --ip-dst extension to `ebtables`, a script has been created specifically for OpenWRT, called `v6brouter_openwrt.sh`. Use the `-R` option to remove v6brouter and *restore* the OpenWRT default bridge configuration.
 
 The script does **not** make any changes to the OpenWRT UCI Configuration. Cycling power to the router will restore your previous configuration. 
 
@@ -330,7 +330,7 @@ Once the packets are at the network layer, `iptables` can do their magic (using 
 
 ### Creating a bridge firewall
 
-As stated earlier the advantage of a v6Brouter is that it just bridges IPv6 traffic, thus extending the existing IPv6 prefix address space. However, you may not want the upstream network to access your network. The answer is to use a firewall, and `ip6ables` is very capable.
+As stated earlier the advantage of a v6Brouter is that it just bridges IPv6 traffic, thus extending the existing IPv6 prefix address space. However, you may not want the upstream network to access your network. The answer is to use a firewall, and `ip6tables` is very capable.
 
 The usual way of creating a firewall is to block traffic from one interface (say the OUTSIDE) and allow traffic from the INSIDE interface. 
 
