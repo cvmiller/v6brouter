@@ -264,7 +264,7 @@ BRIDGE_IP6=2001:470:1d:583::11
 
 ## Dependencies
 
-One only needs to install `ebtables` and `ip` packages. It has been tested on Chaos Calmer (v15.05.1) of OpenWRT. (removed `bash` dependency as of v0.97)
+One only needs to install `ebtables` and `ip` packages. It has been tested on Chaos Calmer (v15.05.1) of OpenWRT. (removed `bash` dependency as of v0.97). It may be required to also install `kmod-br-netfilter` if opkg doesn't install it as part of the `ebtables` install.
 
 #### for Ubuntu or general Linux systems
 
