@@ -279,6 +279,8 @@ It also assumes that two (2) interfaces are available for brouting.
 
 The openwrt version of the script uses the OpenWRT firewall and IPv4 NAT. The script does not change the iptables rules. When using the `-F` option to enable the v6Bridge Firewall, an entry is added to the the ip6tables user chain `forwrding_rule` to drop all *OUTSIDE* IPv6 traffic, except SSH & ICMPv6. ICMPv6 is required for RAs and Neighbour Discovery (ND) to get across the v6Brouter.
 
+`v6brouter` only supports simple bridging (e.g. between two ethernet ports). It does *not* support PPPoE interfaces.
+
 When in v6brouter mode, it *is* possible to log into the OpenWRT router via `ssh` from the **outside network**. You *may* wish to add an IPv6 firewall rule to prevent this. 
 
 
@@ -294,7 +296,7 @@ The script does **NOT** configure any firewall. Do not recommend using this for 
 
 ### Bridging Basics
 
-Bridging is where a device forwards a packet based on the destination MAC address of the packet. A bridge is only useful if it has 2 or more ports. In Linux the `brctl` command is used to assign ports (or interfaces) to the kernel-based bridge.
+Bridging is where a device forwards a packet based on the destination MAC address of the packet. A bridge is only useful if it has 2 or more ports. In Linux the `brctl` command is used to assign ports (or interfaces) to the kernel-based bridge. When using `v6brouter` both ports must be Ethernet (bridging between ethernet and PPPoE is *not* supported).
 
 ### EtherTypes
 
