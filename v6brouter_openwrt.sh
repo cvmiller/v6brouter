@@ -90,30 +90,31 @@ ENABLE=0
 FIREWALL=0
 STATUS=0
 numopts=0
+
 # get args from CLI
 while getopts "?hERFs" options; do
-  case $options in
-    E ) ENABLE=1
-		numopts=$((numopts+1));;
-    R ) RESTORE=1
-		numopts=$((numopts+1));;
-    D ) CLEANUP=1
-		numopts=$((numopts+1));;
-    F ) FIREWALL=1
-		numopts=$((numopts+1));;
-    s ) STATUS=1
-		numopts=$((numopts+1));;
-    d ) DEBUG=1
-		numopts=$((numopts+1));;
-    h ) usage;;
-    \? ) usage	# show usage with flag and no value
-         exit 1;;
-    * ) usage		# show usage with unknown flag
-    	 exit 1;;
-  esac
+	case $options in
+		E ) ENABLE=1
+			numopts=$((numopts+1));;
+		R ) RESTORE=1
+			numopts=$((numopts+1));;
+		D ) CLEANUP=1
+			numopts=$((numopts+1));;
+		F ) FIREWALL=1
+			numopts=$((numopts+1));;
+		s ) STATUS=1
+			numopts=$((numopts+1));;
+		d ) DEBUG=1
+			numopts=$((numopts+1));;
+		h ) usage;;
+		\? ) usage	# show usage with flag and no value
+			exit 1;;
+		* ) usage		# show usage with unknown flag
+			exit 1;;
+	esac
 done
 
-# remove the options as cli arguments
+# remove the options as CLI arguments
 shift $(($numopts))
 
 # check that there are no arguments left to process
@@ -139,19 +140,19 @@ if [ $ERR -eq 1 ]; then
 fi
 
 
-if [ $STATUS -eq 1 ];then
+if [ $STATUS -eq 1 ]; then
 	echo "--- checking status of v6Brouter"
 	erule=$(ebtables -t broute -L | grep IPv6)
 	if [ -z "$erule" ]; then
-		echo "    v6Brouter DISABLED"
+		echo "    v6brouter: disabled"
 	else
-		echo "    v6Brouter enabled"	
+		echo "    v6brouter: enabled"
 	fi
 	exit 0
 fi
 
 
-#restore openwrt default bridge, br-lan
+# restore openwrt default bridge, br-lan
 if [ $RESTORE -eq 1 ]; then
 	echo "-- Restore old bridge:$BRIDGE"
 	brctl delif $BRIDGE $WAN_DEV 2> /dev/null
@@ -165,32 +166,32 @@ if [ $RESTORE -eq 1 ]; then
 	# remove ALLOW_SSH rule from ip6tables /* user rules */
 	ip6tables -D forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j ACCEPT 2> /dev/null
 	# remove allow ICMPv6 rule
-	ip6tables -D forwarding_rule -m mark --mark 16 -p icmpv6  -j ACCEPT 2> /dev/null
+	ip6tables -D forwarding_rule -m mark --mark 16 -p icmpv6 -j ACCEPT 2> /dev/null
 	# remove drop all other packets
-	ip6tables -D forwarding_rule -m mark --mark 16  -j DROP 2> /dev/null
+	ip6tables -D forwarding_rule -m mark --mark 16 -j DROP 2> /dev/null
 	# remove conntrack forwarding rule
 	ip6tables -D forwarding_rule -m mark --mark 16 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-	
-	
+
 	echo "-- Disable ip6tables inspection of bridge traffic"
 	# disable ip6tables inspection of bridge traffic
 	sysctl -w net.bridge.bridge-nf-call-ip6tables=0
 
-	# Sisable RA listen to BRIDGE
+	# disable RA listen on bridge interface
 	echo 1 > /proc/sys/net/ipv6/conf/$BRIDGE/accept_ra
-	
+
 	# restore DHCPv6 server and sending RAs on LAN
-	uci set dhcp.lan.ra=server
-	uci set dhcp.lan.dhcpv6=server
+	uci set dhcp.lan.ra='server'
+	uci set dhcp.lan.dhcpv6='server'
 	uci commit
-	
-	#restore network
+
+	# restore network
 	/etc/init.d/network restart
 fi
 
 
 if [ $CLEANUP -eq 1 ] || [ $RESTORE -eq 1 ]; then
-	# flush ebtables
+
+	# Flush ebtables
 	ebtables -F
 	ebtables -t broute -F
 	ebtables -P FORWARD ACCEPT
@@ -199,7 +200,7 @@ if [ $CLEANUP -eq 1 ] || [ $RESTORE -eq 1 ]; then
 fi
 
 
-#Enable v6brouter openwrt 
+# Enable v6brouter OpenWRT
 if [ $ENABLE -eq 1 ]; then
 
 	echo "--- configuring v6 bridge"
@@ -222,28 +223,26 @@ if [ $ENABLE -eq 1 ]; then
 		exit 1
 	fi
 
-
 	if [ $FIREWALL -eq 1 ];then
 		# Mark $WAN_DEV packets to be dropped by ip6tables (later)
-		ebtables -A  FORWARD -p ipv6 -i $WAN_DEV -j mark --set-mark 16 --mark-target CONTINUE
+		ebtables -A FORWARD -p ipv6 -i $WAN_DEV -j mark --set-mark 16 --mark-target CONTINUE
 	fi
+
 	# allow all packets to be bridged
 	ebtables -P FORWARD ACCEPT
 	ebtables -L
 
-
 	echo "--- Disable IPv6 RA and DHCPv6 Server on LAN"
-	uci set dhcp.lan.ra=disabled
-	uci set dhcp.lan.dhcpv6=disabled
+	uci set dhcp.lan.ra='disabled'
+	uci set dhcp.lan.dhcpv6='disabled'
 	uci commit
 	/etc/init.d/odhcpd restart
 
 	echo "--- assigning IPv6 management address $BRIDGE_IP6 to $BRIDGE"
 	# add IPv6/IPv4 management address to bridge
-	ip addr add  $BRIDGE_IP6/64 dev $BRIDGE
+	ip addr add $BRIDGE_IP6/64 dev $BRIDGE
 	# enable RA listen to BRIDGE
 	echo 2 > /proc/sys/net/ipv6/conf/$BRIDGE/accept_ra
-
 
 	echo "--- configuring brouter to route everything but IPv6"
 	# broute table DROP, means forward to higher level stack
@@ -268,7 +267,7 @@ if [ $ENABLE -eq 1 ]; then
 		ip6tables -A forwarding_rule -m mark --mark 16 -p tcp --dport 22  -j ACCEPT
 
 		# drop all other IPv6 packets
-		ip6tables -A forwarding_rule -m mark --mark 16  -j DROP
+		ip6tables -A forwarding_rule -m mark --mark 16 -j DROP
 		ip6tables -L forwarding_rule
 
 		# Enable ip6tables for the bridge
@@ -282,4 +281,3 @@ else
 fi
 
 echo "--- pau"
-
