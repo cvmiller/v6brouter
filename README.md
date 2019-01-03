@@ -38,6 +38,8 @@ Version 2 has been reworked to address issues with wlan interfaces having differ
 
 It differs from IOPSL's implementation in that it implements a IPv6 Firewall, which blocks all in-bound IPv6 traffic (except SSH & ICMPv6). To enable the firewall, use the `-F` parameter when starting up `v6brouter_openwrt.sh`.
 
+**Note:** As of version 2.0.2, the configuration (/etc/v6brouter.conf) has been separated from the script, making the configurations options more readable, and user friendly. Additionally, the IPv6 brouter rules are also located in the configuration file.
+
 
 ## Examples
 
@@ -361,11 +363,11 @@ ip6tables -A forwarding_rule -m mark --mark 16  -j DROP
 # Enable ip6tables for the bridge
 sysctl -w net.bridge.bridge-nf-call-ip6tables=1
 ```
-Version 0.98 of v6brouter_openwrt.sh now contains this firewall example, enable with **-F** option.
+Version 0.98 of v6brouter_openwrt.sh now contains this firewall example, enable with **-F** option. As of version 2.0.2, firewall options are found in v6brouter.conf file.
 
 ## Contributors
 
-All code by Craig Miller cvmiller at gmail dot com. But ideas, and ports to other embedded platforms beyond OpenWRT are welcome. 
+All code by Craig Miller cvmiller at gmail dot com. But ideas, and ports to other embedded platforms beyond OpenWRT are welcome. Thanks to Jakobi for the separate configuration file enhancement.
 
 
 ## License
