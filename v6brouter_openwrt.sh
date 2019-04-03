@@ -41,7 +41,7 @@
 source /etc/v6brouter.conf
 
 # script version
-VERSION=2.0.2
+VERSION=2.0.3
 
 usage () {
 	# show help
@@ -164,7 +164,7 @@ if [ $RESTORE -eq 1 ]; then
 
 	echo "-- Disable ip6tables inspection of bridge traffic"
 	# disable ip6tables inspection of bridge traffic
-	sysctl -w net.bridge.bridge-nf-call-ip6tables=0
+	sysctl -w net.bridge.bridge-nf-call-ip6tables=0	2>/dev/null
 
 	# disable RA listen on bridge interface
 	echo 1 > /proc/sys/net/ipv6/conf/$BRIDGE/accept_ra
@@ -271,9 +271,9 @@ if [ $ENABLE -eq 1 ]; then
 		ip6tables -A forwarding_rule -m mark --mark 16 -j DROP
 		ip6tables -L forwarding_rule
 
-		# Enable ip6tables for the bridge
+		# Enable ip6tables for the bridge (not required for newer kernels
 		echo "--- enable ip6tables firewall for v6Bridge"
-		sysctl -w net.bridge.bridge-nf-call-ip6tables=1
+		sysctl -w net.bridge.bridge-nf-call-ip6tables=1 2>/dev/null
 	fi
 	# end of ENABLE
 else
