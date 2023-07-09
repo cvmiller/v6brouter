@@ -250,6 +250,23 @@ Install `ebtables` and `ip` on your OpenWRT router using LuCI or via the command
 # opkg install ip
 ```
 
+---
+
+### Installation on OpenWrt 22.03.x or later
+
+As of **OpenWrt 22.03.x**, the older iptables has been replaced with **NetFilter** (NFT). This requires installing a NFT-enabled version of `ebtables` and `ip` commands.
+
+```
+# opkg update
+# opkg install ebtables-nft 
+# opkg install ip6tables-nft
+# opkg install iptables-nft
+# opkg install ip-full
+```
+
+---
+
+
 Copy `v6brouter_openwrt.sh` to your router, edit values (for interfaces, and addresses) near the top of the script and run. 
 
 
